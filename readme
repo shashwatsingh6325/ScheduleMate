@@ -1,1 +1,18 @@
-
+ScheduleMate – “A accountability solution” 
+Problem Statement: “Addressing the challenges faced by users in managing their time and adhering to a 
+schedule.” 
+Key Features: 
+ Timed Countdown: The app incorporates a timer for each activity, displaying a visual countdown to 
+keep users aware of the time remaining for a particular task. 
+ Notifications: Users receive timely notifications reminding them to start or finish an activity. 
+ Flexibility: The app allows users to customize and adjust their schedules. 
+Technologies Used: 
+ SwiftUI and UIKit frameworks for iOS app development. 
+ Swift Playgrounds integrated development environment (IDE) for iOS app development. 
+ UserNotifications Framework is utilized for scheduling and managing notifications. 
+Description: 
+"ScheduleMate" is a time management and accountability app designed to address the challenges users face 
+in managing their time and adhering to schedules. The app features a timed countdown for each activity, 
+providing users with a visual representation of time remaining. Timely notifications help users stay on track, 
+and the app offers flexibility through customizable and adjustable schedules, empowering users to enhance 
+productivity and effectively manage their daily tasks.
