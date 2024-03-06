@@ -1,0 +1,348 @@
+import SwiftUI
+
+struct Activity: Identifiable {
+    var id = UUID()
+    var name: String
+    var timeOfDay: Date
+    var duration: TimeInterval
+}
+
+class ActivitiesViewModel: ObservableObject {
+    @Published var activities: [Activity] = []
+}
+
+struct ContentView: View {
+    @StateObject var viewModel = ActivitiesViewModel()
+    @State private var isAddActivityPresented = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(viewModel.activities) { activity in
+                    NavigationLink(destination: ActivityDetailView(activity: activity)) {
+                        VStack(alignment: .leading) {
+                            Text(activity.name)
+                                .font(.system(size: 35))
+                            Text("Duration: \(formattedDuration(activity.duration))")
+                                .font(.subheadline)
+                            Text("Time of Day: \(formattedTimeOfDay(activity.timeOfDay))")
+                                .font(.subheadline)
+                        }
+                        .frame(width: 370, height: 100)
+                        .padding()
+                        .background(Color.white.opacity(0.2)) // Add a semi-transparent background
+                        .cornerRadius(10) // Optional: Add corner radius for a rounded look
+                        .padding(.top,5)
+                        .navigationTitle("Activity Detail")
+                        
+                    }
+                    .contextMenu {
+                        Button(action: {
+                            deleteActivity(activity)
+                        }) {
+                            Text("Delete")
+                            Image(systemName: "trash")
+                        }
+                    }
+                }
+            }
+            
+            
+            .navigationTitle("Activities")
+            .background(
+                Image("background") 
+                    .resizable()
+                    .scaledToFill()
+                    .edgesIgnoringSafeArea(.all)
+                    .overlay(Color.black.opacity(0.3)))
+            .navigationBarItems(trailing: Button(action: {
+                isAddActivityPresented.toggle()
+            }) {
+                Image(systemName: "plus")
+            })
+        }
+        .sheet(isPresented: $isAddActivityPresented) {
+            AddActivityView(viewModel: viewModel)
+        }
+    }
+    
+    func deleteActivity(_ activity: Activity) {
+        viewModel.activities.removeAll { $0.id == activity.id }
+    }
+    
+    private func formattedDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration / 3600)
+        let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        return "\(hours) hours \(minutes) minutes"
+    }
+    
+    private func formattedTimeOfDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "hh:mm a"
+        return formatter.string(from: date)
+    }   
+}
+
+
+
+struct AddActivityView: View {
+    @ObservedObject var viewModel: ActivitiesViewModel
+    @State private var activityName = ""
+    @State private var timeOfDay = Date()
+    @State private var hours = 0
+    @State private var minutes = 30 // Default duration in minutes
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Activity Details")) {
+                    TextField("Activity Name", text: $activityName)
+                    
+                    // Use a GeometryReader to limit the visible height of the date picker
+                    HStack{
+                        Text("Time")
+                        
+                        GeometryReader { geometry in
+                            DatePicker("", selection: $timeOfDay, displayedComponents: .hourAndMinute)
+                                .datePickerStyle(WheelDatePickerStyle())
+                                .frame(height: geometry.size.height ) // Adjust the divisor to control the visible height
+                        }
+                    }
+                    
+                   
+                    
+                    HStack {
+                        Text("Duration")
+                            .frame(width: 60, alignment: .leading)
+                        
+                        Picker("", selection: $hours) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text("\(hour) Hours")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(height: 200) // Adjust the height as needed
+                        
+                        Picker("", selection: $minutes) {
+                            ForEach(0..<60, id: \.self) { minute in
+                                Text("\(minute) Minutes")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(height: 200) // Adjust the height as needed
+                    }
+                    
+                }
+                
+                
+                Section {
+                    Button(action: {
+                        if !activityName.isEmpty {
+                            addActivity()
+                            presentationMode.wrappedValue.dismiss()
+                        } else {
+                            // Display an alert or handle the case where the name is empty
+                        }
+                    }) {
+                        Text("Add Activity")
+                    }
+                }
+                
+            }
+            
+            .navigationTitle("Add Activity")
+            
+            .navigationBarItems(trailing: Button(action: {
+                presentationMode.wrappedValue.dismiss()
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.red)
+            })
+        }
+        
+    }
+    
+    
+    func addActivity() {
+        let totalMinutes = hours * 60 + minutes
+        let newActivity = Activity(name: activityName, timeOfDay: timeOfDay, duration: TimeInterval(totalMinutes) * 60)
+        viewModel.activities.append(newActivity)
+    }
+}
+
+
+struct ActivityDetailView: View {
+    var activity: Activity
+    
+    var body: some View {
+        VStack {
+            Text(activity.name)
+                .fontWeight(.semibold)
+                .font(.system(size: 50))
+            Text("Time: \(formattedTimeOfDay(activity.timeOfDay))")
+                .font(.title3)
+            Text("Duration: \(formattedDuration(activity.duration))")
+                .font(.title3)
+            TimerView(duration: activity.duration, activityName: activity.name, timeOfDay: activity.timeOfDay)
+                .font(.title3)
+        }
+        .navigationTitle("Activity Detail")
+    }
+    
+    private func formattedDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration / 3600)
+        let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        return "\(hours) hours \(minutes) minutes"
+    }
+    
+    private func formattedTimeOfDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "hh:mm a"
+        return formatter.string(from: date)
+    }
+}
+
+
+
+import SwiftUI
+import UserNotifications
+
+struct TimerView: View {
+    var duration: TimeInterval
+    var activityName: String
+    var timeOfDay: Date
+    
+    @State private var timeRemaining: TimeInterval
+    @State private var isTimerRunning = false
+    @State private var timer: Timer?
+    
+    init(duration: TimeInterval, activityName: String, timeOfDay: Date) {
+        self.duration = duration
+        self.activityName = activityName
+        self.timeOfDay = timeOfDay
+        self._timeRemaining = State(initialValue: duration)
+    }
+    
+    var body: some View {
+        VStack {
+            ZStack {
+                Circle()
+                    .stroke(Color.blue, lineWidth: 15)
+                    .opacity(0.3)
+                    .frame(width: 350, height: 350)
+                
+                Circle()
+                    .trim(from: 0, to: CGFloat(timeRemaining / duration))
+                    .stroke(Color.blue, lineWidth: 5)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear, value: 1)
+                    .shadow(radius: 5)
+                    .frame(width: 350, height: 350)
+                
+                Text("Timer: \(formattedTime(timeRemaining) )")
+                    .font(.largeTitle)
+                    .foregroundColor(.blue)
+            }
+            .padding()
+            
+            HStack {
+                Button(action: {
+                    startTimer()
+                }) {
+                    Text("Start")
+                        .frame(width: 60, height: 60)
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.blue)
+                    
+                }
+                .clipShape(Circle(), style: FillStyle())
+                
+                Button(action: {
+                    pauseTimer()
+                }) {
+                    Text("Stop")
+                        .frame(width: 60, height: 60)
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.red)
+                    
+                }
+                .clipShape(Circle(), style: FillStyle())
+                
+                Button(action: {
+                    resetTimer()
+                }) {
+                    Text("Reset")
+                        .frame(width: 60, height: 60)
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.orange)
+                    
+                }
+                .clipShape(Circle(), style: FillStyle())
+                
+            }
+        }
+        .onAppear {
+            pauseTimer()
+            scheduleNotification()
+        }
+        .onDisappear {
+            cancelNotification()
+        }
+       
+    }
+    
+    private func startTimer() {
+        if !isTimerRunning {
+            isTimerRunning = true
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                if timeRemaining > 0 {
+                    timeRemaining -= 1
+                } else {
+                    pauseTimer()
+                }
+            }
+        }
+    }
+    
+    private func pauseTimer() {
+        isTimerRunning = false
+        timer?.invalidate()
+    }
+    
+    private func resetTimer() {
+        timeRemaining = duration
+        isTimerRunning = false
+        timer?.invalidate()
+        cancelNotification()
+    }
+    
+    private func formattedTime(_ seconds: TimeInterval) -> String {
+        let formattedHours = Int(seconds / 3600)
+        let formattedMinutes = Int((seconds.truncatingRemainder(dividingBy: 3600)) / 60)
+        let formattedSeconds = Int(seconds.truncatingRemainder(dividingBy: 60))
+        return String(format: "%02d:%02d:%02d", formattedHours, formattedMinutes, formattedSeconds)
+    }
+    
+    private func scheduleNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "Reminder"
+        content.body = "It's time for \(activityName)!"
+        
+        var dateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: timeOfDay)
+        dateComponents.second = 0
+        
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    private func cancelNotification() {
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    }
+}
